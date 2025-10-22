@@ -1,0 +1,35 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: 67843765835-nor89us21akvr24ll21og85inqvfpqjg.apps.googleusercontent.com
+            client-secret: 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
+            scope:
+              - openid
+              - profile
+              - email
+          github:
+            client-id: Ov23lirangqllIBf8FgC
+            client-secret: ee4932afb78c4c0a216ca3491a7e122271cb7cfd
+            scope:
+              - read:user
+              - user:email
+        provider:
+          google:
+            issuer-uri: https://accounts.google.com
+
+server:
+  port: 8080
