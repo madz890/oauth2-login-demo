@@ -1,15 +1,24 @@
-spring:
-  datasource:
-    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+server:
+  port: 8080
 
+# --- DATABASE CONFIGURATION ---
+spring:
+  application:
+    name: oath2-login-demo
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/oath2_login_demo?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+    # show-sql: true # 'TRACE org.hibernate.type.descriptor.sql' below is more detailed
 
+# --- OAUTH2 CONFIGURATION ---
   security:
     oauth2:
       client:
@@ -31,5 +40,12 @@ spring:
           google:
             issuer-uri: https://accounts.google.com
 
-server:
-  port: 8080
+# --- LOGGING CONFIGURATION ---
+logging:
+  level:
+    # Set root to INFO to see our custom logs and default Spring Boot logs
+    root: INFO
+    # Set Spring Security to DEBUG for detailed security flow logging
+    org.springframework.security: DEBUG
+    # Set Hibernate SQL parameter binding to TRACE for detailed query info
+    org.hibernate.type.descriptor.sql: TRACE

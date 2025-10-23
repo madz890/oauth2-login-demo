@@ -1,41 +1,76 @@
 package com.sambrana.oauth2login.config;
 
-import com.sambrana.oauth2login.service.CustomOAuth2UserService;
+import com.sambrana.oauth2login.config.OAuth2LoginSuccessHandler;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import jakarta.servlet.http.HttpServletResponse;
+
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import java.util.Arrays;
+import static org.springframework.security.config.Customizer.withDefaults;
 
 @Configuration
+@EnableWebSecurity
 public class SecurityConfig {
 
-    private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
-    private final CustomOAuth2UserService oAuth2UserService;
-
-    public SecurityConfig(OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler, CustomOAuth2UserService oAuth2UserService) {
-        this.oAuth2LoginSuccessHandler = oAuth2LoginSuccessHandler;
-        this.oAuth2UserService = oAuth2UserService;
-    }
+    @Autowired
+    private OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+
+        // --- THIS IS THE FIX ---
+        // 1. Create the repository first
+        CookieCsrfTokenRepository tokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        // 2. Set the cookie path to "/" to make it accessible to React
+        tokenRepository.setCookiePath("/"); 
+        // --- END OF FIX ---
+
         http
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/", "/css/**", "/js/**", "/h2-console/**").permitAll()
+            .cors(withDefaults())
+            .authorizeHttpRequests(authz -> authz
+                .requestMatchers("/", "/error", "/api/me", "/api/csrf").permitAll()
                 .anyRequest().authenticated()
             )
-            .oauth2Login(oauth -> oauth
-                .loginPage("/")
-                .successHandler(oAuth2LoginSuccessHandler)
-                .userInfoEndpoint(userInfo -> userInfo.userService(oAuth2UserService))
+            .oauth2Login(oauth2 -> oauth2
+                .successHandler(this.oAuth2LoginSuccessHandler)
             )
-            .logout(logout -> logout.logoutSuccessUrl("/").permitAll())
-            // allow frames for H2 console
-            .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
-            // disable CSRF for H2 console
-            .csrf(csrf -> csrf.ignoringRequestMatchers(new AntPathRequestMatcher("/h2-console/**")));
+            .logout(logout -> logout // Logout config
+                .logoutUrl("/logout")
+                .logoutSuccessHandler((request, response, authentication) ->
+                    response.setStatus(HttpServletResponse.SC_OK)
+                )
+                .invalidateHttpSession(true)
+                .deleteCookies("JSESSIONID")
+                .permitAll()
+            )
+            .csrf(csrf -> csrf
+                // 3. Use the repository you just configured
+                .csrfTokenRepository(tokenRepository) 
+                .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
+            );
 
         return http.build();
+    }
+
+    // CORS Bean remains the same
+    @Bean
+    CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
+        configuration.setAllowedMethods(Arrays.asList("GET","POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowCredentials(true);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 }
